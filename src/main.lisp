@@ -28,10 +28,10 @@ https://github.com/Pixens/Discord-Build-Number/blob/main/main.py")
 	  :accessor token-of)
    (%heartbeat :initform nil
 	       :documentation
-	       "Sends Opcode 1 (Hearbeat) according to Discord's interval
+	       "Sends Opcode 1 (Heartbeat) according to Discord's interval
 https://discord.com/developers/docs/events/gateway#sending-heartbeats")
    (%latest-sequence-number
-    :initform `(:null)
+    :initform nil
     :documentation "Sent by Discord's dispatch events in the 's' field")
    (%zlib-stream :documentation "Two way binary stream to decompress zlib")
    (%decompressor :documentation
@@ -113,7 +113,9 @@ wasteful. But it does make this a little bit more annoying")))
 		   (socket-of gateway)
 		   (json:with-explicit-encoder
 		     (encode-json-plist-to-string
-		      `(:op 1 :d ,(slot-value gateway '%latest-sequence-number)))))
+		      `(:op 1 :d ,(or
+				   (slot-value gateway '%latest-sequence-number)
+				  `(:null))))))
 		  (format t "Sent heartbeat~%")))
 	      :name "discord heartbeat")))
       ;; Heartbeat ACK
@@ -128,11 +130,7 @@ wasteful. But it does make this a little bit more annoying")))
       ((alist (:op . 0)
 	      (:t . "READY")
 	      (:d . ready-body))
-       (format t "Received READY")
-       (with-open-file (str (format nil "ready-~A.txt" (random 1000))
-			    :direction :output
-			    :if-does-not-exist :create)
-	 (format str "~A" message)))
+       (format t "Received READY"))
       ;; Unknown dispatch event
       ((alist (:op . 0)
 	      (:t . dispatch-event))
