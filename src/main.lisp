@@ -6,7 +6,7 @@
   (:use #:cl #:trivia))
 (in-package #:lulamoon)
 
-(defconstant *gateway* "wss://gateway.discord.gg/?encoding=json&v=9") ; &compress=zlib-stream
+(defconstant *gateway* "wss://gateway.discord.gg/?encoding=json&v=9&compress=zlib-stream")
 (defconstant *user-agent* "Mozilla/5.0 (X11; Linux x86_64; rv:138.0) Gecko/20100101 Firefox/138.0")
 
 (defvar *dc-build-number* 409214
@@ -32,12 +32,32 @@ https://github.com/Pixens/Discord-Build-Number/blob/main/main.py")
 https://discord.com/developers/docs/events/gateway#sending-heartbeats")
    (%latest-sequence-number
     :initform `(:null)
-    :documentation "Sent by Discord's dispatch events in the 's' field")))
+    :documentation "Sent by Discord's dispatch events in the 's' field")
+   (%zlib-stream :documentation "Two way binary stream to decompress zlib")
+   (%decompressor :documentation
+		  "Decompressor for Discord's websocket
+It's initialized at `connect' because it depends on %zlib-stream
+Discord gateway can optionally be compressed with zlib-stream, opting in
+simulates the official client better. Decompressing with zlib-stream is
+the same as the classic zlib format, but the same decompressor state must be
+used for every request. This obviously makes sense from an engineering
+perspective, creating a new decompressor for every message received is
+wasteful. But it does make this a little bit more annoying")))
 
 (defvar *gateway-messages* '())
 
-(defun on-message (gateway message)
-  (let ((body (json:decode-json-from-string message)))
+;; TODO: output a UTF-8 string
+(defun decompress-message (gateway compressed-message)
+  (with-slots (%zlib-stream %decompressor) gateway
+    (write-sequence compressed-message %zlib-stream)
+    (with-output-to-string (msg)
+      (handler-case (loop
+		      (format msg "~C" (code-char (read-byte %decompressor))))
+	(chipz:premature-end-of-stream (e))))))
+
+(defun on-message (gateway compressed-message)
+  (let* ((message (decompress-message gateway compressed-message))
+	 (body (json:decode-json-from-string message)))
     (push body *gateway-messages*)
     (match body
       ;; HELLO
@@ -121,7 +141,11 @@ https://discord.com/developers/docs/events/gateway#sending-heartbeats")
        (format t "Unknown message received (~A)~%" (assoc :op body))))))
 
 (defun connect (gateway)
-  (with-slots (socket %heartbeat) gateway
+  (with-slots (socket %heartbeat %decompressor %zlib-stream) gateway
+    (format t "Initializing zlib~%")
+    (setf %zlib-stream (lulamoon.two-way-byte-stream:make))
+    (setf %decompressor
+	  (chipz:make-decompressing-stream 'chipz:zlib %zlib-stream))
     (format t "Connecting...~%")
     (wsd:on :message socket
 	    (lambda (message)

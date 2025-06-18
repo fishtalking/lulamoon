@@ -15,10 +15,13 @@
                "schemata"
                "schemata.serializers"
                "bordeaux-threads"
-               "frugal-uuid")
+               "frugal-uuid"
+	       "chipz"
+	       "flexi-streams")
   :components ((:module "src"
                 :components
-                ((:file "main"))))
+                ((:file "main")
+		 (:file "two-way-byte-stream"))))
   :description "Discord client"
   :long-description "A client as well as a library for interacting with Discord, trying to mimick in features and API to the official desktop client as close as possible"
   :in-order-to ((test-op (test-op "lulamoon/tests"))))
