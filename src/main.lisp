@@ -55,88 +55,86 @@ wasteful. But it does make this a little bit more annoying")))
 		      (format msg "~C" (code-char (read-byte %decompressor))))
 	(chipz:premature-end-of-stream (e))))))
 
-(defun on-message (gateway compressed-message)
-  (let* ((message (decompress-message gateway compressed-message))
-	 (body (json:decode-json-from-string message)))
-    (push body *gateway-messages*)
-    (match body
-      ;; HELLO
-      ((alist (:op . 10)
-	      (:d . (alist
-		     (:heartbeat--interval . interval))))
-       ;; send identify (2)
-       (wsd:send (socket-of gateway)
+(defun on-message (gateway message-body)
+  (push message-body *gateway-messages*)
+  (match message-body
+    ;; HELLO
+    ((alist (:op . 10)
+	    (:d . (alist
+		   (:heartbeat--interval . interval))))
+     ;; send identify (2)
+     (wsd:send (socket-of gateway)
+	       (json:with-explicit-encoder
+		 (encode-json-plist-to-string
+		  `(:op 2
+		    :d (:object
+			:token ,(token-of gateway)
+			:capabilities 161789
+			:properties
+			(:object
+			 :os "Linux"
+			 :browser "Firefox"
+			 :device ""
+			 :system--locale "en-US"
+			 :has--client--mods false
+			 :browser--user--agent ,*user-agent*
+			 :browser--version "139.0"
+			 :os--version ""
+			 :referrer ""
+			 :referring--domain ""
+			 :referrer--current ""
+			 :referring--domain--current ""
+			 :release--channel "stable"
+			 :client--build--number ,*dc-build-number*
+			 :client--event--source (:null)
+			 :client--launch--id ,*dc-launch-id*
+			 :client--app--state "focused"
+			 :is--fast--conect (:false)
+			 :latest--headless--tasks (:array)
+			 :latest--headless--task--run--seconds--before (:null)
+			 :gateway--connect--reasons "AppSkeleton")
+			:presence (:object :status "unknown"
+					   :since 0
+					   :activities (:array)
+					   :afk (:false))
+			:compress (:false)
+			:client--state (:object :guild--versions (:object)))))))
+     (format t "Identified.~%")
+     
+     ;; start sending heartbeat (1)
+     (setf (slot-value gateway '%heartbeat)
+	   (bt:make-thread
+	    (lambda ()
+	      (loop
+		(sleep (* (/ interval 1000) (+ 0.5 (random 0.5))))
+		(wsd:send
+		 (socket-of gateway)
 		 (json:with-explicit-encoder
 		   (encode-json-plist-to-string
-		    `(:op 2
-		      :d (:object
-			  :token ,(token-of gateway)
-			  :capabilities 161789
-			  :properties
-			  (:object
-			   :os "Linux"
-			   :browser "Firefox"
-			   :device ""
-			   :system--locale "en-US"
-			   :has--client--mods false
-			   :browser--user--agent ,*user-agent*
-			   :browser--version "139.0"
-			   :os--version ""
-			   :referrer ""
-			   :referring--domain ""
-			   :referrer--current ""
-			   :referring--domain--current ""
-			   :release--channel "stable"
-			   :client--build--number ,*dc-build-number*
-			   :client--event--source (:null)
-			   :client--launch--id ,*dc-launch-id*
-			   :client--app--state "focused"
-			   :is--fast--conect (:false)
-			   :latest--headless--tasks (:array)
-			   :latest--headless--task--run--seconds--before (:null)
-			   :gateway--connect--reasons "AppSkeleton")
-			  :presence (:object :status "unknown"
-					     :since 0
-					     :activities (:array)
-					     :afk (:false))
-			  :compress (:false)
-			  :client--state (:object :guild--versions (:object)))))))
-       (format t "Identified.~%")
-       
-       ;; start sending heartbeat (1)
-       (setf (slot-value gateway '%heartbeat)
-	     (bt:make-thread
-	      (lambda ()
-		(loop
-		  (sleep (* (/ interval 1000) (+ 0.5 (random 0.5))))
-		  (wsd:send
-		   (socket-of gateway)
-		   (json:with-explicit-encoder
-		     (encode-json-plist-to-string
-		      `(:op 1 :d ,(or
-				   (slot-value gateway '%latest-sequence-number)
-				  `(:null))))))
-		  (format t "Sent heartbeat~%")))
-	      :name "discord heartbeat")))
-      ;; Heartbeat ACK
-      ((assoc :op 11)
-       (format t "Acknowledged heartbeat~%"))
-      ;; Dispatch events
-      ((alist (:op . 0)
-	      (:s . sequence-number))
-       (setf (slot-value gateway '%latest-sequence-number) sequence-number)
-       (trivia.next:next))
-      ;; READY
-      ((alist (:op . 0)
-	      (:t . "READY")
-	      (:d . ready-body))
-       (format t "Received READY"))
-      ;; Unknown dispatch event
-      ((alist (:op . 0)
-	      (:t . dispatch-event))
-       (format t "Received unknown dispatch ~S~%" dispatch-event))
-      (_
-       (format t "Unknown message received (~A)~%" (assoc :op body))))))
+		    `(:op 1 :d ,(or
+				 (slot-value gateway '%latest-sequence-number)
+				 `(:null))))))
+		(format t "Sent heartbeat~%")))
+	    :name "discord heartbeat")))
+    ;; Heartbeat ACK
+    ((assoc :op 11)
+     (format t "Acknowledged heartbeat~%"))
+    ;; Dispatch events
+    ((alist (:op . 0)
+	    (:s . sequence-number))
+     (setf (slot-value gateway '%latest-sequence-number) sequence-number)
+     (trivia.next:next))
+    ;; READY
+    ((alist (:op . 0)
+	    (:t . "READY")
+	    (:d . ready-body))
+     (format t "Received READY"))
+    ;; Unknown dispatch event
+    ((alist (:op . 0)
+	    (:t . dispatch-event))
+     (format t "Received unknown dispatch ~S~%" dispatch-event))
+    (_
+     (format t "Unknown message received (~A)~%" (assoc :op body)))))
 
 (defun connect (gateway)
   (with-slots (socket %heartbeat %decompressor %zlib-stream) gateway
@@ -147,7 +145,9 @@ wasteful. But it does make this a little bit more annoying")))
     (format t "Connecting...~%")
     (wsd:on :message socket
 	    (lambda (message)
-	      (on-message gateway message)))
+	      (on-message gateway
+			  (json:decode-json-from-string
+			   (decompress-message gateway compressed-message)))))
     (wsd:on :open socket
 	    (lambda ()
 	      (format t "Connected.~%")))
