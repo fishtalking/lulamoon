@@ -29,6 +29,10 @@ https://github.com/Pixens/Discord-Build-Number/blob/main/main.py")
    (token :type string
 	  :initarg :token
 	  :accessor token-of)
+   (user :type schemas:user
+	 :accessor user-of
+	 :documentation
+	 "User object of the current token. It's unbound until it `connect's.")
    (users :type hash-table
 	  :initform (make-hash-table :size 100)
 	  :accessor users-of
@@ -135,8 +139,16 @@ wasteful. But it does make this a little bit more annoying")))
     ;; READY
     ((alist (:op . 0)
 	    (:t . "READY")
-	    (:d . (alist (:users . users-list))))
+	    (:d . (alist (:user . user-body)
+			 (:users . users-list))))
      (format t "Received READY")
+     
+     ;; Get info about logged in user
+     (setf (user-of gateway) (make-instance 'schemas:user))
+     (populate-with-schema (find-schema 'schemas:user)
+			   (user-of gateway)
+			   user-body)
+     
      ;; Populate user cache
      (dolist (user-body users-list)
        (let ((user (make-instance 'schemas:user)))
