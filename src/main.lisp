@@ -6,7 +6,7 @@
   (:import-from :json
 		#:encode-json-plist-to-string)
   (:local-nicknames (:schemas :lulamoon.schemas))
-  (:use #:cl #:trivia))
+  (:use #:cl #:trivia #:arrows))
 (in-package #:lulamoon)
 
 (defconstant *gateway* "wss://gateway.discord.gg/?encoding=json&v=9&compress=zlib-stream")
@@ -58,8 +58,10 @@ wasteful. But it does make this a little bit more annoying")))
   (with-slots (%zlib-stream %decompressor) gateway
     (write-sequence compressed-message %zlib-stream)
     (with-output-to-string (msg)
-      (handler-case (loop
-		      (format msg "~C" (code-char (read-byte %decompressor))))
+      (handler-case (->> (read-byte %decompressor)
+			 (code-char)
+			 (format msg "~C")
+			 (loop))
 	(chipz:premature-end-of-stream (e))))))
 
 (defun on-message (gateway message-body)
@@ -70,42 +72,42 @@ wasteful. But it does make this a little bit more annoying")))
 	    (:d . (alist
 		   (:heartbeat--interval . interval))))
      ;; send identify (2)
-     (wsd:send (socket-of gateway)
-	       (json:with-explicit-encoder
-		 (encode-json-plist-to-string
-		  `(:op 2
-		    :d (:object
-			:token ,(token-of gateway)
-			:capabilities 161789
-			:properties
-			(:object
-			 :os "Linux"
-			 :browser "Firefox"
-			 :device ""
-			 :system--locale "en-US"
-			 :has--client--mods false
-			 :browser--user--agent ,*user-agent*
-			 :browser--version "139.0"
-			 :os--version ""
-			 :referrer ""
-			 :referring--domain ""
-			 :referrer--current ""
-			 :referring--domain--current ""
-			 :release--channel "stable"
-			 :client--build--number ,*dc-build-number*
-			 :client--event--source (:null)
-			 :client--launch--id ,*dc-launch-id*
-			 :client--app--state "focused"
-			 :is--fast--conect (:false)
-			 :latest--headless--tasks (:array)
-			 :latest--headless--task--run--seconds--before (:null)
-			 :gateway--connect--reasons "AppSkeleton")
-			:presence (:object :status "unknown"
-					   :since 0
-					   :activities (:array)
-					   :afk (:false))
-			:compress (:false)
-			:client--state (:object :guild--versions (:object)))))))
+     (->> `(:op 2
+	    :d (:object
+		:token ,(token-of gateway)
+		:capabilities 161789
+		:properties
+		(:object
+		 :os "Linux"
+		 :browser "Firefox"
+		 :device ""
+		 :system--locale "en-US"
+		 :has--client--mods false
+		 :browser--user--agent ,*user-agent*
+		 :browser--version "139.0"
+		 :os--version ""
+		 :referrer ""
+		 :referring--domain ""
+		 :referrer--current ""
+		 :referring--domain--current ""
+		 :release--channel "stable"
+		 :client--build--number ,*dc-build-number*
+		 :client--event--source (:null)
+		 :client--launch--id ,*dc-launch-id*
+		 :client--app--state "focused"
+		 :is--fast--conect (:false)
+		 :latest--headless--tasks (:array)
+		 :latest--headless--task--run--seconds--before (:null)
+		 :gateway--connect--reasons "AppSkeleton")
+		:presence (:object :status "unknown"
+				   :since 0
+				   :activities (:array)
+				   :afk (:false))
+		:compress (:false)
+		:client--state (:object :guild--versions (:object))))
+	  (encode-json-plist-to-string)
+	  (json:with-explicit-encoder)
+	  (wsd:send (socket-of gateway)))
      (format t "Identified.~%")
      
      ;; start sending heartbeat (1)
@@ -114,13 +116,12 @@ wasteful. But it does make this a little bit more annoying")))
 	    (lambda ()
 	      (loop
 		(sleep (* (/ interval 1000) (+ 0.5 (random 0.5))))
-		(wsd:send
-		 (socket-of gateway)
-		 (json:with-explicit-encoder
-		   (encode-json-plist-to-string
-		    `(:op 1 :d ,(or
-				 (slot-value gateway '%latest-sequence-number)
-				 `(:null))))))
+		(->> `(:op 1 :d ,(or
+				  (slot-value gateway '%latest-sequence-number)
+				  `(:null)))
+		     (encode-json-plist-to-string)
+		     (json:with-explicit-encoder)
+		     (wsd:send (socket-of gateway)))
 		(format t "Sent heartbeat~%")))
 	    :name "discord heartbeat")))
     ;; Heartbeat ACK
@@ -157,8 +158,9 @@ wasteful. But it does make this a little bit more annoying")))
     (format t "Connecting...~%")
     (wsd:on :message socket
 	    (lambda (message)
-	      (on-message gateway (json:decode-json-from-string
-				     (decompress-message gateway message)))))
+	      (->> (decompress-message gateway message)
+		   (json:decode-json-from-string)
+		   (on-message gateway))))
     (wsd:on :open socket
 	    (lambda ()
 	      (format t "Connected.~%")))

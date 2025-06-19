@@ -17,7 +17,8 @@
                "bordeaux-threads"
                "frugal-uuid"
 	       "chipz"
-	       "flexi-streams")
+	       "flexi-streams"
+	       "arrows")
   :components ((:module "src"
                 :components
                 ((:file "schemas")
