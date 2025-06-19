@@ -1,8 +1,11 @@
 (uiop:define-package lulamoon
   (:import-from :schemata
-		#:def-schema-class)
+		#:def-schema-class
+		#:populate-with-schema
+		#:find-schema)
   (:import-from :json
 		#:encode-json-plist-to-string)
+  (:local-nicknames (:schemas :lulamoon.schemas))
   (:use #:cl #:trivia))
 (in-package #:lulamoon)
 
@@ -26,6 +29,10 @@ https://github.com/Pixens/Discord-Build-Number/blob/main/main.py")
    (token :type string
 	  :initarg :token
 	  :accessor token-of)
+   (users :type hash-table
+	  :initform (make-hash-table :size 100)
+	  :accessor users-of
+	  :documentation "Maps user id to user information")
    (%heartbeat :initform nil
 	       :documentation
 	       "Sends Opcode 1 (Heartbeat) according to Discord's interval
@@ -127,8 +134,13 @@ wasteful. But it does make this a little bit more annoying")))
     ;; READY
     ((alist (:op . 0)
 	    (:t . "READY")
-	    (:d . ready-body))
-     (format t "Received READY"))
+	    (:d . (alist (:users . users-list))))
+     (format t "Received READY")
+     ;; Populate user cache
+     (dolist (user-body users-list)
+       (let ((user (make-instance 'schemas:user)))
+	 (populate-with-schema (find-schema 'schemas:user) user user-body)
+	 (setf (gethash (schemas:id-of user) (users-of gateway)) user))))
     ;; Unknown dispatch event
     ((alist (:op . 0)
 	    (:t . dispatch-event))

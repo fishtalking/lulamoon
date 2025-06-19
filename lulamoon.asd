@@ -21,7 +21,8 @@
   :components ((:module "src"
                 :components
                 ((:file "main")
-		 (:file "two-way-byte-stream"))))
+		 (:file "two-way-byte-stream")
+		 (:file "schemas"))))
   :description "Discord client"
   :long-description "A client as well as a library for interacting with Discord, trying to mimick in features and API to the official desktop client as close as possible"
   :in-order-to ((test-op (test-op "lulamoon/tests"))))
