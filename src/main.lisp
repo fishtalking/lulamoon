@@ -145,9 +145,8 @@ wasteful. But it does make this a little bit more annoying")))
     (format t "Connecting...~%")
     (wsd:on :message socket
 	    (lambda (message)
-	      (on-message gateway
-			  (json:decode-json-from-string
-			   (decompress-message gateway compressed-message)))))
+	      (on-message gateway (json:decode-json-from-string
+				     (decompress-message gateway message)))))
     (wsd:on :open socket
 	    (lambda ()
 	      (format t "Connected.~%")))
