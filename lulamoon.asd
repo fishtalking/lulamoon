@@ -20,9 +20,9 @@
 	       "flexi-streams")
   :components ((:module "src"
                 :components
-                ((:file "main")
+                ((:file "schemas")
 		 (:file "two-way-byte-stream")
-		 (:file "schemas"))))
+		 (:file "main"))))
   :description "Discord client"
   :long-description "A client as well as a library for interacting with Discord, trying to mimick in features and API to the official desktop client as close as possible"
   :in-order-to ((test-op (test-op "lulamoon/tests"))))
