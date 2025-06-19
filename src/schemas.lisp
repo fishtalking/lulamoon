@@ -24,7 +24,9 @@
 	   #:avatar-decoration-data-of
 	   #:collectibles-of
 	   #:primary-guild-of
-	   #:clan-of)
+	   #:clan-of
+	   #:pronouns-of
+	   #:about-me-of)
   (:use #:cl))
 (in-package #:lulamoon.schemas)
 
@@ -54,36 +56,42 @@
 		 :initform nil
 		 :required nil
 		 :accessor mfa-enabled-of)
-   (banner :initform nil
+   (banner :type (or string null)
+	   :initform nil
 	   :required nil
 	   :accessor banner-of
 	   :documentation "string (or nil) of the banner's asset id")
-   (accent--color :initform nil
+   (accent--color :type (or integer null)
+		  :initform nil
 		  :required nil
 		  :accessor accent-color-of
 		  :documentation "number representing the user's profile color")
-   (locale :type string
-	   :initform "en-US"
+   (locale :type (or string null)
+	   :initform nil
 	   :required nil
 	   :accessor locale-of)
    (verified :type boolean
 	     :initform nil
 	     :required nil
 	     :accessor verified-of)
-   (email :initform nil
+   (email :type (or string null)
+	  :initform nil
 	  :required nil
 	  :accessor email-of
 	  :documentation "string (or nil) of user's email")
-   (flags :initform nil
+   (flags :type (or integer null)
+	  :initform nil
 	  :required nil
 	  :accessor flags-of
 	  :documentation "integer (or nil) representing user's flags")
-   (premium--type :initform nil
+   (premium--type :type (or integer null)
+		  :initform nil
 		  :required nil
 		  :accessor premium-type-of
 		  :documentation
 		  "integer (or nil) representing the user's premium type")
-   (public--flags :initform nil
+   (public--flags :type (or integer null)
+		  :initform nil
 		  :required nil
 		  :accessor public-flags-of
 		  :documentation
@@ -91,6 +99,14 @@
    (avatar--decoration--data :initform nil
 			     :required nil
 			     :accessor avatar-decoration-data-of)
+   (pronouns :type (or string null)
+	     :initform nil
+	     :required nil
+	     :accessor pronouns-of)
+   (bio :type (or string null)
+	:initform nil
+	:required nil
+	:accessor about-me-of)
    
    ;; undocumented:
    
