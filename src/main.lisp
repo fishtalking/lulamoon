@@ -144,14 +144,14 @@ wasteful. But it does make this a little bit more annoying")))
      (format t "Received READY")
      
      ;; Get info about logged in user
-     (setf (user-of gateway) (make-instance 'schemas:user))
+     (setf (user-of gateway) (make-instance 'schemas:user :client gateway))
      (populate-with-schema (find-schema 'schemas:user)
 			   (user-of gateway)
 			   user-body)
      
      ;; Populate user cache
      (dolist (user-body users-list)
-       (let ((user (make-instance 'schemas:user)))
+       (let ((user (make-instance 'schemas:user :client gateway)))
 	 (populate-with-schema (find-schema 'schemas:user) user user-body)
 	 (setf (gethash (schemas:id-of user) (users-of gateway)) user))))
     ;; Unknown dispatch event

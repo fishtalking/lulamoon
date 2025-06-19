@@ -6,6 +6,7 @@
 	   ;; accessors:
 	   
 	   #:id-of
+	   #:client-of
 	   #:username-of
 	   #:discriminator-of
 	   #:global-name-of
@@ -32,10 +33,17 @@
 
 ;; cl-json turns snake_case into this--thing
 
-(def-schema-class user ()
-  ((id :type string
-       :accessor id-of)
-   (username :type string
+(def-schema-class base-discord-object ()
+  ((%client :initarg :client
+	    :required nil
+	    :accessor client-of
+	    :documentation "The client object that created this object.")
+   (id :type string
+       :accessor id-of
+       :documentation "Snowflake ID of the object")))
+
+(def-schema-class user (base-discord-object)
+  ((username :type string
 	     :accessor username-of)
    (discriminator :type string
 		  :accessor discriminator-of)
